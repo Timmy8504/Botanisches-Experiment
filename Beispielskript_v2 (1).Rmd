@@ -1,0 +1,491 @@
+---
+title: "Bio IV Beispielskript"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  fig_width: 4 
+  fig_height: 4 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T,results = "hide")
+knitr::opts_chunk$set(echo = T,message =  F)
+```
+
+# Projektvorbereitung
+Erstellen Sie einen Ordner `Analyse_bioIV` auf Ihrem  Computer und legen Sie dort Ihre Tabelle mit den gesammelten Daten ab.
+Speichern Sie das leere Dokument (oder eine Kopie dieses Skripts) ebenfalls in diesem Ordner ab. 
+
+# Packages
+
+## Packages installieren
+R kommt mit Standardfunktionen. Zusätzliche Funktionen können hinzigefügt werden.
+Fuer solche Funktionen ist es notwendig, Packages zu installieren und zu laden.
+Packages muessen nur einmal installiert werden, aber jedes Mal neu geladen werden. Die Installation kann etwas dauern, da diese Libraries umfangreich sein können.
+
+
+```{r, eval=FALSE}
+install.packages("tidyverse")
+install.packages("agricolae")
+
+```
+
+## Laden der Packages tidyverse und agricolae.
+
+Packages müssen jedes Mal neu geladen werden, wenn R neu ausgeführt wird.
+
+```{r, results='hide',message=FALSE}
+library(tidyverse)
+library(agricolae)
+```
+
+
+# Einlesen der Daten
+Nun können die Daten eingelesen werden.
+Bitte stellen Sie sicher, dass Ihre Input-Tabellen den im Praktikum gezeigten Formatansprüchen entsprechen.
+Reihen und Spalten sollten sinnvolle Namen haben (aber nicht zu lang sein) und die Datei sollte sich im .csv Format befinden.
+Die Spalten sollten durch Tabs (Tabulartaste) oder ";" voneinander getrennt sein. 
+Bitte benennen Sie die experimentellen Faktoren auch nicht nur mit Zahlen (z.B. die Stufen des Sandanteils im Boden mit 0, 30 und 70).
+Wort und Zahlenkombinationen sind okay z.B sand_0,sand_30,sand_70. 
+Bitte vermeiden Sie auch Leerzeichen in den Namen (z.B. Sandanteil 70)
+Falls Sie nicht wissen, wie man eine Tabelle aus Excel als .csv Format  (mit , oder ;) exportiert fragen Sie bitte Ihren Betreuer.  
+Mit dem folgenden Befehl wird das Format .“csv“ erwartet.
+
+
+```{r}
+data <- read_delim("Beispieldatensatz.csv", delim=";", col_names =TRUE)
+```
+
+Es wird ein Datensatz "data" erzeugt.
+delim=";": Spalten in der eingelesenen Datei sind mit ";" getrennt
+col_names =TRUE: Die Überschriftenzeile wird zur Benennung der Spalten übernommen
+
+
+# Ansicht der Daten
+Jetzt können wir die Daten ansehen.
+Zuerst sollte ein Ueberblick ueber die Daten gewonnen werden.
+
+
+
+```{r,}
+head(data)
+```
+Mit `head()` werden die ersten 6 Zeilen des Datensatzes angezeigt.
+
+## Zusammenfassung der Daten
+
+Einige Statistiken zu den einzelnen Spalten werden angezeigt, wie Mittelwert, Median, Minimum, etc. 
+
+```{r}
+summary(data)
+```
+
+
+Mit `str()` wird die Struktur des Datensatzes angezeigt. Wurden die Spalten als Faktoren, Zahlen, Characters etc. eingelesen?
+```{r}
+str(data)
+```
+Sind die Daten gleichmässig erhoben worden?
+Dazu kann eine Tabelle erstellt werden, um sich die Anzahl der Replikate anzeigen zu lassen. 
+Über die Dollarzeichen kann man spezifische Spalten in der Tabelle anwählen.
+
+
+```{r}
+  
+table(data$Duenger, data$Dichte)
+```
+
+
+Hier sieht man, dass für jede Bedingung gleich viele Daten erhoben wurden.
+Diese Funktion kann auch genutzt werden um Messwerte anzusehen.
+```{r}
+table(data$Duenger, data$Blattanzahl08)
+```
+
+Auch komplexere Zusammenfassungen sind möglich.
+`%>%` ist eine sogenannte "Pipe", die den Befehl weiterführt. In diesem Fall macht es etwas mit `data`. mit `select` werden einzelne Spalten ausgewählt
+```{r}
+data_mean <- data %>%
+  group_by(Duenger, Dichte) %>%
+  summarise(
+    count = n(),
+    mean = mean(GewichtSpross, na.rm=T),
+    sd = sd(GewichtSpross, na.rm=T))
+
+```
+
+In diesem Beispiel wird grupiert, und verschiedene Zusammenfassungen werden erstellt. 
+
+# Datenvorbereitung
+
+Um nur bestimmte Spalten im Datensatz zu behalten können wir einzelne Spalten in einen neuen Datensatz schreiben 
+
+```{r}
+data2 <-   data %>%
+  select(c("Duenger", "Dichte", "GewichtSpross"))
+```
+
+
+## Erstellen eines neuen Faktors der die Interaktion/Kombination von 2 Spalten darstellt
+
+```{r}
+
+data <- data %>% 
+  mutate(DuengerDichte=interaction(Duenger,Dichte))
+
+```
+
+Sehen Sie sich jetzt erneut mit head(data)  und Str(data) ihre Tabelle an. 
+Wie sieht folgende Tabelle aus?
+
+```{r}
+
+table(data$Duenger, data$DuengerDichte)
+
+```
+## Zahlenreihen in Kategorien umwandeln
+
+R versucht vorhezusagen welche Art von Daten jede Spalte enthält. Wenn eine Spalte nur Zahlen enthält, geht das Programm davon aus, dass diese als Zahlen behandelt werden sollen. 
+Manchmal ist diese Einschätzung jedoch nicht korrekt. z.B. für Düngerstufen (z.B. 0,50,100) oder (hier) Tray (Ein Tray ist eine Kulturschule, in die die Einzeltöpfe gestellt werden). Dann müssen wir dies ändern.
+```{r}
+str(data)
+data <- data %>%
+  mutate(Tray= as.factor(Tray),
+         Duenger= as.factor(Duenger),
+         Dichte= as.factor(Dichte))
+str(data)
+```
+
+
+## Daten filtern
+```{r}
+data_filt <- data %>%
+  filter(Duenger=="D0",Dichte=="D")
+```
+
+
+```{r}
+mean(data_filt$GewichtSpross)
+```
+
+## Filtern und Zusammenfassen in einem Schritt
+Um sich das Erstellen einer neuen Tabelle zu sparen, kann man wieder das „%>%“ Symbol verwenden, um die Ausgabe der filter Funktion direkt weiterzuleiten
+```{r}
+data %>% 
+  filter(Duenger=="D0",Dichte=="D") %>% 
+  summarize(mean(GewichtSpross))
+
+data %>% 
+  filter(Duenger=="D0",Dichte=="D") %>% 
+  summarize(median(GewichtSpross))
+
+data %>% 
+  filter(Duenger=="D0",Dichte=="D") %>% 
+  summarize(sd(GewichtSpross))
+```
+
+# Auswertung der Daten
+Für alle Abbildungen wird die Funktion ggplot verwendet (weche wir mit dem "tidyverse" package geladen haben). zunächst wird global das Aussehen für alle Abbildungen festgelegt und die Schriftgröße angepasst
+
+Eine Liste mit möglichen „Themes“ finden Sie hier: https://ggplot2.tidyverse.org/reference/ggtheme.html
+Waehlen Sie die Art von Darstellung, die ihnen zusagt!
+
+
+```{r}
+
+theme_set(theme_minimal(base_size = 16))
+
+```
+
+## Korrelation zwischen Merkmalen
+
+Korrelationen können zwischen quantitativen Merkmalen berechnet und dargestellt werden. 
+Kann eine Korrelation zum Beispiel zwischen GewichtSpross und Gewicht_Infloreszenz gefunden werden?
+
+Eine korrelation kann über einen Biplot (ein Merkmal auf der x und ein Merkmal auf der y Achse) dargestellt werden.
+
+```{r}
+
+ggplot(data=data,aes(x=GewichtSpross,y=Gewicht_Infloreszenz)) +
+  geom_point()
+```
+Für alle ggplot Befehle definiert man zunächst was dargestellt werden soll. Dies geschieht mit Hilfe von sog. Aesthetics (aes).
+Mit Hilfe der "geom_" Funktionen kann man definieren, wie die Daten dargestellt werden sollen, z.B. als Punkte mit der geom_point Funktion.
+
+
+Nun können wir auch noch eine lineare Regressionsgerade hinzufügen mit geom_smooth; die Punkte können mit "size" vergrößert werden.
+Falls Sie die Standardabweichung nicht eintragen wollen, geben Sie “se=F“ ein. 
+
+```{r}
+
+ggplot(data=data,aes(x=GewichtSpross,y=Gewicht_Infloreszenz)) +
+  geom_point() +
+  geom_smooth(method="lm",se=F)
+```
+Die Aesthetics können auch noch erweitert werden um z.B. die Punkte/Linien basierend auf einem Faktor einzufärben
+
+```{r}
+ggplot(data=data,aes(x=GewichtSpross,y=Gewicht_Infloreszenz,col=Duenger))+
+  geom_point()+
+  geom_smooth(method="lm",se=F)
+```
+
+Nun sollten wir noch lesbare Achsenbeschriftungen hinzufügen dies können wir mit `labs` tun.
+
+```{r}
+ggplot(data=data,aes(x=GewichtSpross,y=Gewicht_Infloreszenz,col=Duenger))+
+  geom_point()+
+  geom_smooth(method="lm",se=F) +
+  labs(x="Sprossgewicht (g)", y="Infloreszenzgewicht (g)", col= "Düngerstufen")
+```
+
+Um eine Abbildung zu speichern, können wir `ggsave()` benutzen
+
+```{r}
+ggsave("korrelation_Sprossgewicht_Infloreszenzgewicht.png")
+```
+
+### Korrelationstests
+
+Die Abbildung kann uns einen ersten Anhaltspunkt geben, ob Merkmale korreliert sind.
+Um dies jedoch zu beweisen, benötigen wir einen statistischen Test.
+
+```{r}
+CorTest_Spross_Infloreszenz <- cor.test(data$GewichtSpross, data$Gewicht_Infloreszenz)
+
+CorTest_Spross_Infloreszenz
+```
+
+
+```{r}
+CorTest_Spross_Infloreszenz$p.value
+```
+
+
+
+Mit diesem Befehl sieht man was im Objekt CorTest_Spross_Infloreszenz gespeichert ist.
+Sprossmasse und Infloreszenzmasse scheinen bei diesem Versuch korreliert zu sein.
+
+Dieses Ergebnis kann dem Plot als Bildunterschrift hinzugefügt werden.
+Dazu verwendet man die labs() Funktion, mit der man z.B. eine Bildunterschrift(caption=) hinzufügen kann. Hier kann aber auch ein Titel (title=) oder Untertitel(subtitle=) hinzugefügt werden.
+Um den Text für die Bildunterschrift zu erstellen benutzen wir hier die paste() Funktion, welche Textstücke zusammensetzt, z.B. paste0(„A“,“B“,3,sep=“_“) ergibt „A_B_3“. Die round() Funktion nutzt man, um Zahlenwerte auf eine gewünschte Anzahl von Nachkommastellen zu runden. 
+
+```{r}
+ggplot(data=data,aes(x=GewichtSpross,y=Gewicht_Infloreszenz))+
+  geom_point()+
+  geom_smooth(method="lm",se=F) +
+  labs(x="Sprossgewicht (g)", y="Infloreszenzgewicht (g)", col= "Düngerstufen", 
+       caption=paste0("r=", round(CorTest_Spross_Infloreszenz$estimate,3),",p=",formatC(CorTest_Spross_Infloreszenz$p.value, format = "e", digits = 1)))
+
+```
+
+Der Korrelationstest kann auch nur für bestimmte Kategorien durchgeführt werden (hier fuer Duenger=D0, um zu testen ob die Stärke der Korrelation vom Treatment abhängt. Entsprechend koennen die anderen Unergruppen für Duenger und Dichte analysiert werden
+
+```{r}
+
+cor.test(formula=~GewichtSpross+Gewicht_Infloreszenz,data=filter(data,Duenger=="D3"))
+
+```
+
+
+## Darstellung von Merkmalen in Abhaengigkeit von Faktoren
+
+Um die Werte einer Messung unter verschiedenen Bedingungen zu visualisieren, kann ein Boxplot verwendet werden.
+Wie verhält sich GewichtSpross in Abhängigkeit von der Düngerzugabe?
+
+
+```{r}
+ggplot(data=data,aes(y=GewichtSpross,x=Duenger))+
+  geom_boxplot()
+```
+Und wie in Abhaengigkeit von der Dichte?
+
+```{r}
+ggplot(data=data,aes(y=GewichtSpross,x=Dichte))+
+  geom_boxplot()
+```
+
+
+```{r}
+ggplot(data=data,aes(y=GewichtSpross,x=Duenger,fill=Dichte))+
+  geom_boxplot()
+```
+
+
+```{r}
+ggplot(data=data,aes(y=GewichtSpross,x=Dichte,fill=Duenger))+
+  geom_boxplot() +
+  labs(y="Sprossgewicht (g)")
+```
+
+
+```{r}
+ggplot(data=data,aes(y=GewichtSpross,x=DuengerDichte,fill=Dichte)) +
+  geom_boxplot()+
+  labs(x = "Dünger*Dichte",y="Sprossgewicht (g)")
+
+```
+
+## Statistische Auswertung der Merkmale
+
+### Signifikanztest mit ANOVA
+
+Hierzu verwenden wir das Package `agricolae`. Es beinhaltet verschiedene Funktionen zur statistischen Analyse.
+```{r}
+library(agricolae)
+```
+
+Wir möchten wissen ob das `GewichtSpross` von Duenger und Dichte signifikant beeinflusst wird?
+Hier testen wir ein lineares Model, bei dem angenommen wird, dass Duenger und Licht unabhaengig auf die Sprossmasse einwirken.
+
+```{r}
+Spr.aov <- aov(GewichtSpross ~ Duenger * Dichte, data = data)
+summary(Spr.aov)
+```
+
+Es ist zu sehen, dass es nicht nur einen signifikanten Einfluss der einzelnen Faktoren alleine gibt, sondern auch eine Interaktion.
+
+### Mittelwertvergleich
+
+Welche der 6 Kombinationen der Bedingungen Duenger und Dichte unterscheiden sich voneinander?
+Hierzu kann eine weitere Statistik herangezogen werden, die "Tukey multiple pairwise-comparisons".
+
+
+```{r}
+hsd_res=HSD.test(Spr.aov,c("Duenger","Dichte"),alpha=0.05)
+
+hsd_res
+
+```
+Hier ist nun eine Uebersicht der signifikanten und nicht signifikanten Unterschiede der einzelnen Bedingungen zu sehen.
+
+### Darstellung mit Mittelwertvergleich
+
+Je nach Ergebniss der ANOVA wählen wir die Darstellung aus. Sollte (wie hier) die Interaktion signifikant sein, stellen wir die Kombination der Faktoren da.
+Sollten ein oder beide Faktoren ABER NICHT die Interaktion signifikant sein, erstellen wir nur Plots der signifikanten Einzelfaktoren.
+
+Um signifikante Unterschiede in Boxplots darzustellen, wird häufig das sogenannte "Compact Letter Display" verwendet.
+Teilen zwei Gruppen mindestens einen Buchstaben, sind sie nicht signifikant unterschiedlich.
+
+Aus dem Ergebnis des HSD Tests extrahieren wir nur die Gruppenzuordnung.
+
+```{r}
+
+sigtab=hsd_res$groups
+
+```
+
+zum Plotten benötigt man eine Spalte mit den Gruppennamen. Bisher sind die Gruppennamen in den Reihennamen gespeichert.
+
+
+```{r}
+rownames(sigtab)
+```
+
+hier fällt auf, dass zwischen den Bedingungen „:“ stehen und nicht „.“ Wie in der data Tabelle. Daher müssen wir die „:“ mit Punkten ersetzen und nutzen dafür die sub() Funktion. Die Ausgabe der Funktion speichern wir in einer neuen Spalte mit dem Namen „factors“.
+
+```{r}
+sigtab$factors=sub(":",".",row.names(sigtab))
+```
+
+
+Jetzt muessten noch die signifikanten Unterschiede in den Plot eingetragen werden. Dies kann man mit geom_text machen.
+Für geom_text soll die Tabelle sigtab verwendet werden und es werden auch die Aesthetics neu definiert, um zu der neuen Tabelle zu passen. Die alten Aesthetics sollen dabei „vergessen“ werden, deshalb setzen wir „inherit.aes=F“.
+Die Buchstaben (Spalte groups) werden als Aesthetic „label“ genutzt, also „label=groups“.
+Die Buchstaben, die die signifikanten Unterschiede angeben, koennen direkt über das Konfidenzintervall im Plot geschrieben werden.
+Dafür muss die maximale Hoehe des Boxplots beachtet werden und der y-Wert bei geom_text so angepasst werden, dass die Buchstaben in einen Bereich der Boxplots fallen, wo sie nicht stören. 
+
+
+```{r}
+p1 <- ggplot(data=data,aes(y=GewichtSpross,x=DuengerDichte,fill=Duenger)) +
+  geom_boxplot()+ 
+  geom_text(data=sigtab,aes(x=factors,y=25,label=groups), size=8, inherit.aes = F)+
+  labs(x="Dünger*Dichte", y="Sprossgewicht (g)")
+
+p1
+```
+um Platz zu sparen kann man die Legende auch ausblenden
+
+```{r}
+p1 +
+  theme(legend.position = "none")
+
+```
+oder verschieben
+```{r}
+p1 +
+  theme(legend.position = "top")
+```
+
+Nun kann die Abbildung gespeichert werden
+```{r}
+ggsave("Boxplot_Sprossgewicht_interaktion.png", width = 20, height= 15, units = "cm",bg="white")
+```
+
+
+## Darstellen von Wachstum über die Zeit
+
+Die Wachstumskurven ermöglichen Ihnen die Entwicklung der Merkmale über die Zeit darzustellen. 
+Dieser Teil ist für Ihre Auswertung nicht essentiell, aber bietet eine schöne Möglichkeit den Verlauf zu beobachten.
+
+Zur Darstellung der Daten über die Zeit muss die Tabelle umgeformt werden. Hierzu stehen Funktionen in weiteren Packages zur Verfügung.
+
+```{r, message=FALSE}
+library(reshape2)
+library(stringi)
+```
+
+
+die Spalten mit der Blattzahl werden zunächst aufgelöst, so dass alle Werte untereinanderstehen. Aus den Spaltennamen wird ein neuer Faktor erstellt.
+
+```{r}
+data_m <- melt(data,id.vars = c("Nr", "Duenger", "Dichte", "DuengerDichte"), measure.vars = c("Blattanzahl08", "Blattanzahl15", "Blattanzahl22", "Blattanzahl29"))
+
+
+```
+
+Verschaffen Sie sich eine Übersicht über die neue Tabelle. Was ist passiert?
+
+```{r}
+head(data_m)
+summary(data_m)
+
+```
+
+Um eine Spalte für die Zeit zu bekommen können wir die letzen beiden Zeichen aus der Spalte "variable" extrahieren
+
+```{r}
+
+
+data_m <- data_m %>%
+  mutate(days=as.numeric(stri_sub(data_m$variable,-2,-1)))
+
+```
+
+Jetzt können die Daten für jede Pflanzen dargestellt werden. Dazu muss man noch die group Aesthetic definieren und die Pflanzennummer zuweisen
+
+```{r}
+ggplot(data=data_m,aes(x=days,y=value,group=Nr,col=Dichte))+
+  geom_line()+ 
+  labs(x="Tage", y= "Blattzahl")
+
+```
+Zur besseren Übersicht kann man wieder den Mittelwert und die Standardabweichung für jedes Treatment und jede Woche berechnen
+```{r}
+data_m_mean <- data_m %>%
+  group_by(DuengerDichte,days) %>% 
+  summarise(mean_bz=mean(value,na.rm=T), sd_bz=sd(value,na.rm=T))
+```
+**Sehen Sie sich das Objekt data_m_mean an!**
+
+ür die Darstellung können wir auch die Standardabweichung nach oben und unten als Schattierung um die Linien zeichnen.
+Auch hier können Sie Parameter ändern, um ihre Abbildung „schöner“ zu gestalten 
+
+```{r}
+ggplot(data=data_m_mean,aes(x=days,y=mean_bz,col=DuengerDichte, fill=DuengerDichte))+
+  geom_line()+ 
+  geom_ribbon(aes(ymin=mean_bz-sd_bz, ymax=mean_bz+sd_bz),alpha=0.2,col=alpha("white",0)) +
+  labs(x="Tage", y= "Blattzahl", col="Dünger*Dichte",fill="Dünger*Dichte")
+```
+
